@@ -1,0 +1,7 @@
+# всякая хрень
+.git
+__pycache__
+*.pyc
+.pytest_cache
+Dockerfile.*
+.gitignore
