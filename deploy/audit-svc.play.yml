@@ -2,23 +2,6 @@
   hosts: all
   tags: [deploy]
 
-  module_defaults:
-    community.postgresql.postgresql_ping:
-      login_host: "{{ pg_cont.container.NetworkSettings.Networks[audit_net].IPAddress }}"
-      login_port: 5432
-      login_user: postgres
-      login_password: "{{ pg_superuser_password }}"
-    community.postgresql.postgresql_user:
-      login_host: "{{ pg_cont.container.NetworkSettings.Networks[audit_net].IPAddress }}"
-      login_port: 5432
-      login_user: postgres
-      login_password: "{{ pg_superuser_password }}"
-    community.postgresql.postgresql_db:
-      login_host: "{{ pg_cont.container.NetworkSettings.Networks[audit_net].IPAddress }}"
-      login_port: 5432
-      login_user: postgres
-      login_password: "{{ pg_superuser_password }}"
-
   tasks:
     - name: Docker network
       community.docker.docker_network:
@@ -42,10 +25,16 @@
         env:
           POSTGRES_PASSWORD: "{{ pg_superuser_password }}"
       no_log: true
-      register: pg_cont
 
     - name: Wait for Postgres
       community.postgresql.postgresql_ping:
+        login_host: "localhost"
+        login_user: postgres
+        login_password: "{{ pg_superuser_password }}"
+      vars:
+        ansible_connection: community.docker.docker
+        ansible_docker_extra_args: ""
+      delegate_to: "{{ pg_container }}"
       register: pg_ping
       until: pg_ping.is_available
       retries: 30
@@ -54,14 +43,26 @@
 
     - name: Role audit_svc
       community.postgresql.postgresql_user:
+        login_host: "localhost"
+        login_user: postgres
+        login_password: "{{ pg_superuser_password }}"
         name: "{{ pg_user }}"
         password: "{{ audit_svc_password }}"
+      vars:
+        ansible_connection: community.docker.docker
+      delegate_to: "{{ pg_container }}"
       no_log: true
 
     - name: Database audit owned by audit_svc
       community.postgresql.postgresql_db:
+        login_host: "localhost"
+        login_user: postgres
+        login_password: "{{ pg_superuser_password }}"
         name: "{{ pg_db }}"
         owner: "{{ pg_user }}"
+      vars:
+        ansible_connection: community.docker.docker
+      delegate_to: "{{ pg_container }}"
     
     - name: Config dir
       ansible.builtin.file:
@@ -91,11 +92,11 @@
           - "{{ audit_cfg_dir }}:/etc/audit-svc:ro"
       register: migrate_result
       changed_when: false
-      failed_when: migrate_result.status | default(0) != 0
+      failed_when: migrate_result.container.State.ExitCode | default(0) != 0
 
     - name: Show migration log
       ansible.builtin.debug:
-        msg: "{{ migrate_result.container.Output.splitlines() }}"
+        msg: "{{ migrate_result.container.Output | default('') | splitlines() }}"
 
     - name: audit-svc container
       community.docker.docker_container:
