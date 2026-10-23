@@ -59,7 +59,8 @@ jobs:
           context: .
           tags: ${{ env.IMAGE }}:${{ env.TAG }}
           provenance: false
-          sbom: false
+          build-args: |
+            SOURCE_DATE_EPOCH=1700000000
           outputs: type=image,push=true,rewrite-timestamp=true
   
   deploy:
