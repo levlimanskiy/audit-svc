@@ -9,3 +9,7 @@ audit_svc_password: "{{ vault_audit_svc_password }}"
 audit_image: ghcr.io/levlimanskiy/audit-svc
 audit_container: audit-svc
 audit_cfg_dir: "{{ lookup('env', 'HOME') }}/audit-svc"
+nginx_container: nginx
+nginx_host_port: 8088
+exporter_container: nginx-exporter
+exporter_host_port: 9113

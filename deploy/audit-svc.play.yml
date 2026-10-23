@@ -4,18 +4,18 @@
 
   module_defaults:
     community.postgresql.postgresql_ping:
-      login_host: 127.0.0.1
-      login_port: "{{ pg_host_port }}"
+      login_host: "{{ pg_cont.container.NetworkSettings.Networks[audit_net].IPAddress }}"
+      login_port: 5432
       login_user: postgres
       login_password: "{{ pg_superuser_password }}"
     community.postgresql.postgresql_user:
-      login_host: 127.0.0.1
-      login_port: "{{ pg_host_port }}"
+      login_host: "{{ pg_cont.container.NetworkSettings.Networks[audit_net].IPAddress }}"
+      login_port: 5432
       login_user: postgres
       login_password: "{{ pg_superuser_password }}"
     community.postgresql.postgresql_db:
-      login_host: 127.0.0.1
-      login_port: "{{ pg_host_port }}"
+      login_host: "{{ pg_cont.container.NetworkSettings.Networks[audit_net].IPAddress }}"
+      login_port: 5432
       login_user: postgres
       login_password: "{{ pg_superuser_password }}"
 
@@ -38,8 +38,7 @@
           - name: "{{ audit_net }}"
         volumes:
           - "{{ pg_volume }}:/var/lib/postgresql/data"
-        published_ports:
-          - "127.0.0.1:{{ pg_host_port }}:5432"
+        register: pg_cont
         env:
           POSTGRES_PASSWORD: "{{ pg_superuser_password }}"
       no_log: true
@@ -114,7 +113,46 @@
           - name: "{{ audit_net }}"
         volumes:
           - "{{ audit_cfg_dir }}:/etc/audit-svc:ro"
-  
+
+    - name: Nginx config dir
+      ansible.builtin.file:
+        path: "{{ audit_cfg_dir }}/nginx"
+        state: directory
+        mode: "0755"
+
+    - name: Nginx config
+      ansible.builtin.template:
+        src: nginx.conf.j2
+        dest: "{{ audit_cfg_dir }}/nginx/default.conf"
+        mode: "0644"
+      notify: Reload nginx
+
+    - name: Nginx container
+      community.docker.docker_container:
+        name: "{{ nginx_container }}"
+        image: nginx:1.27
+        state: started
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ audit_net }}"
+        volumes:
+          - "{{ audit_cfg_dir }}/nginx:/etc/nginx/conf.d:ro"
+        published_ports:
+          - "127.0.0.1:{{ nginx_host_port }}:8080"
+
+    - name: Nginx exporter
+      community.docker.docker_container:
+        name: "{{ exporter_container }}"
+        image: nginx/nginx-prometheus-exporter:1.4
+        command:
+          - "--nginx.scrape-uri=http://{{ nginx_container }}:8081/stub_status"
+        state: started
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ audit_net }}"
+        published_ports:
+          - "127.0.0.1:{{ exporter_host_port }}:9113"
+
   handlers:
     - name: Reload audit-svc
       community.docker.docker_container_exec:
@@ -123,3 +161,8 @@
           - python
           - -c
           - "import urllib.request as u; print(u.urlopen(u.Request('http://127.0.0.1:8080/reload', method='POST')).read())"
+    
+    - name: Reload nginx
+      community.docker.docker_container_exec:
+        container: "{{ nginx_container }}"
+        argv: [nginx, -s, reload]
