@@ -21,3 +21,5 @@ server.tar.gz
 .env
 .vault_pass
 *.retry
+
+tests/

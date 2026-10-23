@@ -1,6 +1,5 @@
 - name: Deploy audit-svc stack
   hosts: all
-  become: true
   tags: [deploy]
 
   module_defaults:
