@@ -38,6 +38,7 @@
           - name: "{{ audit_net }}"
         volumes:
           - "{{ pg_volume }}:/var/lib/postgresql/data"
+        published_ports: []
         env:
           POSTGRES_PASSWORD: "{{ pg_superuser_password }}"
       no_log: true
@@ -95,11 +96,6 @@
     - name: Show migration log
       ansible.builtin.debug:
         msg: "{{ migrate_result.container.Output.splitlines() }}"
-
-    - name: Resolve image
-      community.docker.docker_image_info:
-        name: "{{ audit_image }}:{{ release_tag }}"
-      register: img
 
     - name: audit-svc container
       community.docker.docker_container:
