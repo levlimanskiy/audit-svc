@@ -38,10 +38,10 @@
           - name: "{{ audit_net }}"
         volumes:
           - "{{ pg_volume }}:/var/lib/postgresql/data"
-        register: pg_cont
         env:
           POSTGRES_PASSWORD: "{{ pg_superuser_password }}"
       no_log: true
+      register: pg_cont
 
     - name: Wait for Postgres
       community.postgresql.postgresql_ping:
