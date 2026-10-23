@@ -77,6 +77,26 @@
       no_log: true
       notify: Reload audit-svc
 
+     - name: Run migrations
+      community.docker.docker_container:
+        name: audit-migrate
+        image: "{{ audit_image }}:{{ release_tag }}"
+        command: migrate
+        detach: false
+        cleanup: true
+        user: "{{ ansible_facts.user_uid }}:{{ ansible_facts.user_gid }}"
+        networks:
+          - name: "{{ audit_net }}"
+        volumes:
+          - "{{ audit_cfg_dir }}:/etc/audit-svc:ro"
+      register: migrate_result
+      changed_when: false
+      failed_when: migrate_result.status | default(0) != 0
+
+    - name: Show migration log
+      ansible.builtin.debug:
+        msg: "{{ migrate_result.container.Output.splitlines() }}"
+        
     - name: audit-svc container
       community.docker.docker_container:
         name: "{{ audit_container }}"
