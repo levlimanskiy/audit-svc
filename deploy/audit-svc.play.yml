@@ -101,11 +101,12 @@
       community.docker.docker_image_info:
         name: "{{ audit_image }}:{{ release_tag }}"
       register: img
-      
+
     - name: audit-svc container
       community.docker.docker_container:
         name: "{{ audit_container }}"
         image: "{{ audit_image }}:{{ release_tag }}"
+        image_name_mismatch: ignore
         state: started
         restart_policy: unless-stopped
         user: "{{ ansible_facts.user_uid }}:{{ ansible_facts.user_gid }}"
