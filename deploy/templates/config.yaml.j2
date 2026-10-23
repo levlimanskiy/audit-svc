@@ -1,0 +1,6 @@
+database:
+  host: {{ pg_container }}
+  port: 5432
+  name: {{ pg_db }}
+  user: {{ pg_user }}
+  password: "{{ audit_svc_password }}"

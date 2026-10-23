@@ -1,0 +1,11 @@
+audit_net: audit-net
+pg_container: audit-postgres
+pg_volume: audit-pg-data
+pg_host_port: 55432   
+pg_db: audit
+pg_user: audit_svc
+pg_superuser_password: "{{ vault_pg_superuser_password }}"
+audit_svc_password: "{{ vault_audit_svc_password }}"
+audit_image: ghcr.io/levlimanskiy/audit-svc
+audit_container: audit-svc
+audit_cfg_dir: "{{ lookup('env', 'HOME') }}/audit-svc"

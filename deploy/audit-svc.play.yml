@@ -1,0 +1,100 @@
+- name: Deploy audit-svc stack
+  hosts: all
+  become: true
+  tags: [deploy]
+
+  module_defaults:
+    community.postgresql.postgresql_ping:
+      login_host: 127.0.0.1
+      login_port: "{{ pg_host_port }}"
+      login_user: postgres
+      login_password: "{{ pg_superuser_password }}"
+    community.postgresql.postgresql_user:
+      login_host: 127.0.0.1
+      login_port: "{{ pg_host_port }}"
+      login_user: postgres
+      login_password: "{{ pg_superuser_password }}"
+    community.postgresql.postgresql_db:
+      login_host: 127.0.0.1
+      login_port: "{{ pg_host_port }}"
+      login_user: postgres
+      login_password: "{{ pg_superuser_password }}"
+
+  tasks:
+    - name: Docker network
+      community.docker.docker_network:
+        name: "{{ audit_net }}"
+
+    - name: Postgres data volume
+      community.docker.docker_volume:
+        name: "{{ pg_volume }}"
+
+    - name: Postgres container
+      community.docker.docker_container:
+        name: "{{ pg_container }}"
+        image: postgres:17
+        state: started
+        restart_policy: unless-stopped
+        networks:
+          - name: "{{ audit_net }}"
+        volumes:
+          - "{{ pg_volume }}:/var/lib/postgresql/data"
+        published_ports:
+          - "127.0.0.1:{{ pg_host_port }}:5432"
+        env:
+          POSTGRES_PASSWORD: "{{ pg_superuser_password }}"
+      no_log: true
+
+    - name: Wait for Postgres
+      community.postgresql.postgresql_ping:
+      register: pg_ping
+      until: pg_ping.is_available
+      retries: 30
+      delay: 2
+      no_log: true
+
+    - name: Role audit_svc
+      community.postgresql.postgresql_user:
+        name: "{{ pg_user }}"
+        password: "{{ audit_svc_password }}"
+      no_log: true
+
+    - name: Database audit owned by audit_svc
+      community.postgresql.postgresql_db:
+        name: "{{ pg_db }}"
+        owner: "{{ pg_user }}"
+    
+    - name: Config dir
+      ansible.builtin.file:
+        path: "{{ audit_cfg_dir }}"
+        state: directory
+        mode: "0750"
+
+    - name: Service config
+      ansible.builtin.template:
+        src: config.yaml.j2
+        dest: "{{ audit_cfg_dir }}/config.yaml"
+        mode: "0640"
+      no_log: true
+      notify: Reload audit-svc
+
+    - name: audit-svc container
+      community.docker.docker_container:
+        name: "{{ audit_container }}"
+        image: "{{ audit_image }}:{{ release_tag }}"
+        state: started
+        restart_policy: unless-stopped
+        user: "{{ ansible_facts.user_uid }}:{{ ansible_facts.user_gid }}"
+        networks:
+          - name: "{{ audit_net }}"
+        volumes:
+          - "{{ audit_cfg_dir }}:/etc/audit-svc:ro"
+  
+  handlers:
+    - name: Reload audit-svc
+      community.docker.docker_container_exec:
+        container: "{{ audit_container }}"
+        argv:
+          - python
+          - -c
+          - "import urllib.request as u; print(u.urlopen(u.Request('http://127.0.0.1:8080/reload', method='POST')).read())"
