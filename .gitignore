@@ -19,3 +19,5 @@ server.tar.gz
 
 # Локальные переменные окружения
 .env
+.vault_pass
+*.retry
