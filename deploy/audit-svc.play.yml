@@ -77,7 +77,7 @@
       no_log: true
       notify: Reload audit-svc
 
-     - name: Run migrations
+    - name: Run migrations
       community.docker.docker_container:
         name: audit-migrate
         image: "{{ audit_image }}:{{ release_tag }}"
@@ -96,7 +96,7 @@
     - name: Show migration log
       ansible.builtin.debug:
         msg: "{{ migrate_result.container.Output.splitlines() }}"
-        
+
     - name: audit-svc container
       community.docker.docker_container:
         name: "{{ audit_container }}"
